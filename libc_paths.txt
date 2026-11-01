@@ -1,0 +1,8 @@
+include_dir="C:\msvc"
+msvc_lib_dir="C:\msvc"
+crt_dir="C:\msvc"
+kernel32_lib_dir="C:\msvc"
+
+sys_include_dir="C:/msvc/VC/Tools/MSVC/14.51.36231/include;C:/msvc/Windows Kits/10/Include/10.0.28000.0/um;C:/msvc/Windows Kits/10/Include/10.0.28000.0/ucrt;C:/msvc/Windows Kits/10/Include/10.0.28000.0/winrt;C:/msvc/Windows Kits/10/Include/10.0.28000.0/shared;C:/msvc/Windows Kits/10/Include/10.0.28000.0/cppwinrt"
+cc_dir="C:\msvc"
+darwin_sdk_dir="C:\msvc"
