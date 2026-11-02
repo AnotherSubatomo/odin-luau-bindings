@@ -337,6 +337,7 @@ pub fn build(b: *std.Build) void {
         "VM/src/lvmutils.cpp",
     }, &inc_vm, create_opts);
 
+    // Add `luau_init.cpp`, read more about it by opening the file
     vm_lib.root_module.addCSourceFile(.{ .file = b.path("luau_init.cpp"), .flags = create_opts.FLAGS });
 
     // ==================================================================
