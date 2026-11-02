@@ -10,19 +10,28 @@ import "core:c"
 
 when ODIN_OS == .Windows {
 	foreign import LuauCompiler {
-		"./target/lib/Luau.Compiler.lib",
-		"./target/lib/Luau.AST.lib",
-		"./target/lib/Luau.CLI.lib.lib",
+		"./target/lib/luau.Compiler.lib",
+		"./target/lib/luau.Ast.lib",
+		"./target/lib/Luau.Bytecode.lib",
+		"./target/lib/Luau.VM.lib",
+		"./target/lib/Luau.Common.lib",
 	}
 } else {
 	foreign import LuauCompiler {
-		"./target/lib/Luau.Compiler.a",
-		"./target/lib/Luau.AST.a",
-		"./target/lib/Luau.CLI.lib.a",
+		"./target/lib/luau.Compiler.a",
+		"./target/lib/luau.Ast.a",
+		"./target/lib/Luau.Bytecode.a",
+		"./target/lib/Luau.VM.a",
+		"./target/lib/Luau.Common.a",
 	}
 }
 
+// return a type identifier for a global library member
+// values are defined by 'enum LuauBytecodeType' in Bytecode.h
 LibraryMemberTypeCallback     :: #type proc "c" (library: cstring, member: cstring) -> c.int
+
+// setup a value of a constant for a global library member
+// use luau_set_compile_constant_*** set of functions for values
 LibraryMemberConstantCallback :: #type proc "c" (library: cstring, member: cstring, constant: rawptr)
 
 CompileOptions :: struct {
@@ -54,6 +63,10 @@ CompileOptions :: struct {
 	// alternative vector type name for type tables, in addition to default type 'vector'
 	vector_type: cstring,
 
+	// 0 - 32-bit float vector components
+    // 1 - 64-bit double vector components
+    vector_precision: c.int, // default=0
+
 	// null-terminated array of globals that are mutable; disables the import optimization for fields accessed through these
 	mutable_globals: [^]cstring,
 
@@ -69,10 +82,21 @@ CompileOptions :: struct {
 	disabled_builtins: [^]cstring,
 }
 
-@(link_prefix="luau_")
+@(link_prefix="luau_", default_calling_convention="c")
 foreign LuauCompiler {
 	// compile source to bytecode; when source compilation fails, the resulting bytecode contains the encoded error. use free() to destroy
 	compile :: proc(source: cstring, size: c.size_t, options: ^CompileOptions, out_size: ^c.size_t) -> cstring ---
+
+	// when libraryMemberConstantCb is called, these methods can be used to set a value of the opaque lua_CompileConstant struct
+	// vector component 'w' is not visible to VM runtime configured with LUA_VECTOR_SIZE == 3, but can affect constant folding during compilation
+	// string storage must outlive the invocation of 'luau_compile' which used the callback
+	luau_set_compile_constant_nil :: proc(constant: rawptr) ---
+	luau_set_compile_constant_boolean :: proc(constant: rawptr, b: c.int) ---
+	luau_set_compile_constant_number :: proc(constant: rawptr, n: c.double) ---
+	luau_set_compile_constant_integer64 :: proc(constant: rawptr, l: c.int64_t) ---
+	luau_set_compile_constant_vector :: proc(constant: rawptr, x, y, z, w: c.float) ---
+	luau_set_compile_constant_vectord :: proc(constant: rawptr, x, y, z, w: c.double) ---
+	luau_set_compile_constant_string :: proc(constant: rawptr, s: cstring, l: c.size_t) ---
 }
 
 // Required for whatever reason, do not delete!
