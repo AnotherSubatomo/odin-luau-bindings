@@ -39,7 +39,7 @@ Strbuf :: struct {
 // with the VM's internal buffer type.
 Buffer :: Strbuf
 
-@(link_prefix = "luaL_")
+@(link_prefix = "luaL_", default_calling_convention="c")
 foreign LuauVM {
 	register     :: proc(L: ^State, libname: cstring, l: [^]Reg) ---
 	getmetafield :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
@@ -74,7 +74,6 @@ foreign LuauVM {
 
 	checkbuffer :: proc(L: ^State, narg: c.int, len: ^c.size_t) -> rawptr ---
 
-	// NOTE: @(link_name) overrides @(link_prefix), so this correctly links to luaL_where
 	@(link_name = "luaL_where")
 	_where :: proc(L: ^State, lvl: c.int) ---
 
@@ -184,20 +183,20 @@ addstring :: #force_inline proc "c" (B: ^Strbuf, s: cstring) {
 // Builtin libraries
 // ---------------------------------------------------------------------------
 
-COLIBNAME     :: "coroutine"
-TABLIBNAME    :: "table"
-OSLIBNAME     :: "os"
-STRLIBNAME    :: "string"
-BITLIBNAME    :: "bit32"
-BUFFERLIBNAME :: "buffer"
-UTF8LIBNAME   :: "utf8"
-CLASSLIBNAME  :: "class"
-MATHLIBNAME   :: "math"
-DBLIBNAME     :: "debug"
-VECLIBNAME    :: "vector"
-INTLIBNAME    :: "integer"
+COLIBNAME     : cstring : "coroutine"
+TABLIBNAME    : cstring : "table"
+OSLIBNAME     : cstring : "os"
+STRLIBNAME    : cstring : "string"
+BITLIBNAME    : cstring : "bit32"
+BUFFERLIBNAME : cstring : "buffer"
+UTF8LIBNAME   : cstring : "utf8"
+CLASSLIBNAME  : cstring : "class"
+MATHLIBNAME   : cstring : "math"
+DBLIBNAME     : cstring : "debug"
+VECLIBNAME    : cstring : "vector"
+INTLIBNAME    : cstring : "integer"
 
-@(link_prefix = "lua")
+@(link_prefix = "lua", default_calling_convention="c")
 foreign LuauVM {
 	open_base      :: proc(L: ^State) -> c.int ---
 	open_coroutine :: proc(L: ^State) -> c.int ---
@@ -214,7 +213,7 @@ foreign LuauVM {
 	open_integer   :: proc(L: ^State) -> c.int ---
 }
 
-@(link_prefix = "luaL_")
+@(link_prefix = "luaL_", default_calling_convention="c")
 foreign LuauVM {
 	openlibs      :: proc(L: ^State) ---
 	sandbox       :: proc(L: ^State) ---

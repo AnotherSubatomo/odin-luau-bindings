@@ -1,10 +1,10 @@
 // Zig-based build system for Luau, for those who have Zig and not CMake.
 
 // To build the static library binaries from scratch, run the command below (replacing the [target] accordingly):
-// zig build --prefix ./src/target -DLUAU_EXTERN_C=true -DLUAU_STATIC_CRT=true -Dinstall-libs=true -Dtarget=[target]
+// zig build --prefix ./src/target -DLUAU_EXTERN_C=true -DLUAU_STATIC_CRT=true -Dinstall-libs=true -Doptimize=small -Dtarget=[target]
 
 // Example:
-// zig build --prefix ./src/target -DLUAU_EXTERN_C=true -DLUAU_STATIC_CRT=true -Dinstall-libs=true -Dtarget=x86_64-windows-msvc -Dlibc=libc_paths.txt
+// zig build --prefix ./src/target -DLUAU_EXTERN_C=true -DLUAU_STATIC_CRT=true -Dinstall-libs=true -Doptimize=small -Dtarget=x86_64-windows-msvc -Dlibc=libc_paths.txt
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) void {
     const USE_MSVC = target.result.abi == .msvc;
 
     const LUAU_SRC = b.option([]const u8, "luau-src", " Path to Luau source directory") orelse "luau";
-    const unsure_libc_paths = b.option([]const u8, "libc", "LibC paths") orelse null;
+    const unsure_libc_paths = b.option([]const u8, "libc", "Provide a file which specifies libc paths") orelse null;
     const install_libs = b.option(bool, "install-libs", "Install libraries to zig-out/lib") orelse false;
 
     const LIBC_PATHS: ?std.Build.LazyPath = if (unsure_libc_paths) |p| b.path(p) else null;
@@ -336,6 +336,8 @@ pub fn build(b: *std.Build) void {
         "VM/src/lclasslib.cpp", "VM/src/lvector.cpp",    "VM/src/lvmload.cpp",
         "VM/src/lvmutils.cpp",
     }, &inc_vm, create_opts);
+
+    vm_lib.root_module.addCSourceFile(.{ .file = b.path("luau_init.cpp"), .flags = create_opts.FLAGS });
 
     // ==================================================================
     // 5. Luau.Compiler

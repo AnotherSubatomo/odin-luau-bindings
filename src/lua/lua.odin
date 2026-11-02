@@ -151,7 +151,7 @@ Number   :: c.double
 Integer  :: c.int
 Unsigned :: c.uint
 
-@(link_prefix="lua_")
+@(link_prefix="lua_", default_calling_convention="c")
 foreign LuauVM {
 	/*
 	** state manipulation
@@ -232,8 +232,8 @@ foreign LuauVM {
 	}
 	pushlstring      :: proc(L: ^State, s: cstring, l: c.size_t) ---
 	pushstring       :: proc(L: ^State, s: cstring) ---
-	pushvfstring     :: proc "c" (L: ^State, fmt: cstring, argp: cstring) -> cstring ---
-	pushfstringL     :: proc "c" (L: ^State, fmt: cstring, #c_vararg args: ..any) -> cstring ---
+	pushvfstring     :: proc(L: ^State, fmt: cstring, argp: cstring) -> cstring ---
+	pushfstringL     :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> cstring ---
 	pushcclosurek    :: proc(L: ^State, fn: CFunction, debugname: cstring, nup: c.int, cont: Continuation) ---
 	pushboolean      :: proc(L: ^State, b: c.int) ---
 	pushthread       :: proc(L: ^State) -> c.int ---
@@ -278,9 +278,10 @@ foreign LuauVM {
 	setfenv      :: proc(L: ^State, idx: c.int) -> c.int ---
 
 	/*
-	** `call' functions (run Luau bytecode)
+	** `load` and `call` functions (load and run Luau bytecode)
 	*/
-
+	@(link_name="luau_load")
+	load   :: proc(L: ^State, chunkname: cstring, data: cstring, size: c.size_t, env: c.int) -> Status ---
 	call   :: proc(L: ^State, nargs, nresults: c.int) ---
 	pcall  :: proc(L: ^State, nargs, nresults, errfunc: c.int) -> Status ---
 	cpcall :: proc(L: ^State, fn: CFunction, ud: rawptr) -> c.int ---
@@ -304,14 +305,6 @@ foreign LuauVM {
 	hasfinalizers :: proc(L: ^State) -> c.int ---
 	pushfinalizerfunction :: proc(L: ^State, co: ^State, toclose: c.int) ---
 	addfinalizer  :: proc(L: ^State, co: ^State, idx: c.int) ---
-}
-
-/*
-** `load' function (load Luau bytecode)
-*/
-foreign LuauVM {
-	@(link_name="luau_load")
-	load :: proc(L: ^State, chunkname: cstring, data: cstring, size: c.size_t, env: c.int) -> Status ---
 }
 
 /*
@@ -345,7 +338,7 @@ GCOp :: enum c.int {
 	GCISPAUSED,
 }
 
-@(link_prefix = "lua_")
+@(link_prefix = "lua_", default_calling_convention="c")
 foreign LuauVM {
 	gc :: proc(L: ^State, what, data: c.int) -> c.int ---
 
@@ -414,15 +407,15 @@ foreign LuauVM {
 	registeruserdatadirectfieldget :: proc(L: ^State, tag: c.int, field: cstring, fn: UserdataDirectFieldGet) ---
 
 	// helpers for writing result values from direct field handlers
-	userdatadirectfield_setnumber    :: proc(result: rawptr, n: c.double) ---
+	userdatadirectfield_setnumber     :: proc(result: rawptr, n: c.double) ---
 	when VECTOR_SIZE == 4 {
 		userdatadirectfield_setvector :: proc(result: rawptr, x, y, z, w: VECTOR_TYPE) ---
 	} else {
 		userdatadirectfield_setvector :: proc(result: rawptr, x, y, z: VECTOR_TYPE) ---
 	}
-	userdatadirectfield_setboolean   :: proc(result: rawptr, b: c.int) ---
-	userdatadirectfield_setinteger64 :: proc(result: rawptr, n: i64) ---
-	userdatadirectfield_setnil       :: proc(result: rawptr) ---
+	userdatadirectfield_setboolean    :: proc(result: rawptr, b: c.int) ---
+	userdatadirectfield_setinteger64  :: proc(result: rawptr, n: i64) ---
+	userdatadirectfield_setnil        :: proc(result: rawptr) ---
 
 	setlightuserdataname :: proc(L: ^State, tag: c.int, name: cstring) ---
 	getlightuserdataname :: proc(L: ^State, tag: c.int) -> cstring ---
@@ -537,7 +530,7 @@ Callbacks :: struct {
 	onfree:              #type proc "c" (L: ^State, block: rawptr),
 }
 
-@(link_prefix = "lua_")
+@(link_prefix = "lua_", default_calling_convention="c")
 foreign LuauVM {
 	// invoke a debug hook on a thread in break/yield state
 	// userdata is passed to hook through lua_Debug::userdata field
