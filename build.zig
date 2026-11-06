@@ -150,8 +150,10 @@ pub fn build(b: *std.Build) void {
     const current_version = builtin.zig_version;
 
     if (current_version.order(min_version) == .lt) {
-        std.debug.print("\n\x1b[31mError: Your Zig version ({}) is too old.\x1b[0m" ++
-            "\x1b[32mMinimum required version is: {}\x1b[0m\n\n", .{ current_version, min_version });
+        const err_msg =
+            "\n\x1b[31mError: Your Zig version ({d}.{d}.{d}) is too old.\x1b[0m " ++
+            "\x1b[32mMinimum required version is: {d}.{d}.{d}\x1b[0m\n\n";
+        std.debug.print(err_msg, .{ current_version.major, current_version.minor, current_version.patch, min_version.major, min_version.minor, min_version.patch });
 
         std.process.exit(1);
     }
@@ -162,7 +164,6 @@ pub fn build(b: *std.Build) void {
 
     const USE_MSVC = target.result.abi == .msvc;
 
-    const LUAU_SRC = b.option([]const u8, "luau-src", " Path to Luau source directory") orelse "luau";
     const unsure_libc_paths = b.option([]const u8, "libc", "Provide a file which specifies libc paths") orelse null;
     const install_libs = b.option(bool, "install-libs", "Install libraries to zig-out/lib") orelse false;
 
@@ -170,95 +171,70 @@ pub fn build(b: *std.Build) void {
 
     if (USE_MSVC and LIBC_PATHS == null) @panic("-Dlibc is required when targeting the MSVC ABI");
 
-    const build_cli = b.option(bool, "LUAU_BUILD_CLI", "Build CLI tools") orelse false;
-    const build_tests = b.option(bool, "LUAU_BUILD_TESTS", "Build tests") orelse false;
-    const build_web = b.option(bool, "LUAU_BUILD_WEB", "Build web module") orelse false;
+    const LUAU_SRC = b.option([]const u8, "LUAU_DIR", " Path to Luau source directory") orelse "luau";
+    const BUILD_CLI = b.option(bool, "LUAU_BUILD_CLI", "Build CLI tools") orelse false;
+    const BUILD_TESTS = b.option(bool, "LUAU_BUILD_TESTS", "Build tests") orelse false;
+    const BUILD_WEB = b.option(bool, "LUAU_BUILD_WEB", "Build web module") orelse false;
     const STATIC_CRT = b.option(bool, "LUAU_STATIC_CRT", "Link with the static CRT (/MT)") orelse false;
-    const extern_c = b.option(bool, "LUAU_EXTERN_C", "Use extern C for all APIs") orelse false;
-    const build_shared = b.option(bool, "LUAU_BUILD_SHARED", "Build as shared library") orelse false;
+    const EXTERN_C = b.option(bool, "LUAU_EXTERN_C", "Use extern C for all APIs") orelse false;
+    const BUILD_SHARED = b.option(bool, "LUAU_BUILD_SHARED", "Build as shared library") orelse false;
 
     // Compile time options for Luau features
-    const vec_double = b.option(bool, "LUAU_VECTOR_DOUBLE", "Use 64-bit doubles for vector components") orelse false;
-    const vec_four_wide = b.option(bool, "LUAU_VECTOR_FOUR_WIDE", "Enable 4-wide mode for vectors, adding a 'w' component") orelse false;
+    const VEC_DOUBLE = b.option(bool, "LUAU_VECTOR_DOUBLE", "Use 64-bit doubles for vector components") orelse false;
+    const VEC_FOUR_WIDE = b.option(bool, "LUAU_VECTOR_FOUR_WIDE", "Enable 4-wide mode for vectors, adding a 'w' component") orelse false;
 
-    if (build_shared and !extern_c) @panic("-DLUAU_BUILD_SHARED requires -DLUAU_EXTERN_C to be true");
-
-    // Unsupport
-    _ = build_tests;
-    _ = build_web;
-    _ = vec_double;
-    _ = vec_four_wide;
+    if (BUILD_SHARED and !EXTERN_C) @panic("-DLUAU_BUILD_SHARED requires -DLUAU_EXTERN_C to be true");
 
     // -------------------- IO --------------------
-    // Write to the build root so both the compiler's `-include` lookup
-    // AND Zig's cache-dependency checker can find it as a literal path.
     var threaded: std.Io.Threaded = .init(b.allocator, .{});
     defer threaded.deinit();
     const io = threaded.io();
 
-    // -------------------- Generate extern "C" header --------------------
-    if (extern_c) {
-        const prefix =
-            "#pragma once\n" ++
-            "#ifdef __cplusplus\n";
+    // -------------------- Generate additional, opted, header definitions --------------------
+    const extern_c_prefix =
+        "#pragma once\n" ++
+        "#ifdef __cplusplus\n";
 
-        const body_shared_msvc =
-            "#define LUA_API extern \"C\" __declspec(dllexport)\n" ++
+    const extern_c_body = if (BUILD_SHARED and target.result.abi == .msvc)
+        "#define LUA_API extern \"C\" __declspec(dllexport)\n" ++
             "#define LUACODE_API extern \"C\" __declspec(dllexport)\n" ++
-            "#define LUACODEGEN_API extern \"C\" __declspec(dllexport)\n";
-
-        const body_shared_gcc =
-            "#define LUA_API extern \"C\" __attribute__((visibility(\"default\")))\n" ++
+            "#define LUACODEGEN_API extern \"C\" __declspec(dllexport)\n"
+    else if (BUILD_SHARED)
+        "#define LUA_API extern \"C\" __attribute__((visibility(\"default\")))\n" ++
             "#define LUACODE_API extern \"C\" __attribute__((visibility(\"default\")))\n" ++
-            "#define LUACODEGEN_API extern \"C\" __attribute__((visibility(\"default\")))\n";
-
-        const body_static =
-            "#define LUA_API extern \"C\"\n" ++
+            "#define LUACODEGEN_API extern \"C\" __attribute__((visibility(\"default\")))\n"
+    else
+        "#define LUA_API extern \"C\"\n" ++
             "#define LUACODE_API extern \"C\"\n" ++
             "#define LUACODEGEN_API extern \"C\"\n";
 
-        const suffix =
-            "#define LUA_USE_LONGJMP 1\n" ++
-            "#endif\n";
+    const extern_c_suffix =
+        "#define LUA_USE_LONGJMP 1\n" ++
+        "#endif\n";
 
-        const body = if (build_shared and target.result.abi == .msvc)
-            body_shared_msvc
-        else if (build_shared)
-            body_shared_gcc
-        else
-            body_static;
+    const header_content = std.mem.concat(b.allocator, u8, &[_][]const u8{
+        extern_c_prefix, extern_c_body, extern_c_suffix, if (VEC_DOUBLE) "#define LUA_VECTOR_DOUBLE=1\n" else "", if (VEC_FOUR_WIDE) "#define LUA_VECTOR_SIZE=4\n" else "",
+    }) catch @panic("out of memory");
 
-        const header = std.mem.concat(
-            b.allocator,
-            u8,
-            &[_][]const u8{ prefix, body, suffix },
-        ) catch @panic("out of memory");
-
-        // cwd() is on std.Io.Dir, not on Io.
-        std.Io.Dir.cwd().access(io, "luau_extern_c.h", .{}) catch {
-            std.Io.Dir.cwd().writeFile(io, .{
-                .sub_path = "luau_extern_c.h",
-                .data = header,
-            }) catch @panic("failed to write luau_extern_c.h");
-        };
-    }
-
-    // -------------------- Flags --------------------
-    // Zig 0.15+ std.ArrayList is the unmanaged variant (no .init), so we
-    // simply prepare two const slices and pick the right one.
-    const base_flags = [_][]const u8{
-        "-D_CRT_SECURE_NO_WARNINGS",
-        "-Wsign-compare",
-        "-fexceptions",
-        "-std=c++17",
+    // Write to the build root so both the compiler's `-include` lookup
+    // AND Zig's cache-dependency checker can find it as a literal path.
+    std.Io.Dir.cwd().access(io, "luau_target_comp_defs.h", .{}) catch {
+        std.Io.Dir.cwd().writeFile(io, .{
+            .sub_path = "luau_target_comp_defs.h",
+            .data = header_content,
+        }) catch @panic("failed to write luau_target_comp_defs.h");
     };
-    const base_flags_with_include =
-        base_flags ++ [_][]const u8{ "-include", "luau_extern_c.h" };
-    const cpp17: []const []const u8 =
-        if (extern_c) &base_flags_with_include else &base_flags;
 
+    // -------------------- Create artifact options --------------------
     const create_opts = CreateOptions{
-        .FLAGS = cpp17,
+        .FLAGS = &[_][]const u8{
+            "-D_CRT_SECURE_NO_WARNINGS",
+            "-Wsign-compare",
+            "-fexceptions",
+            "-std=c++17",
+            "-include",
+            "luau_target_comp_defs.h",
+        },
         .LIBC_PATHS = LIBC_PATHS,
         .STATIC_CRT = STATIC_CRT,
         .USE_MSVC = USE_MSVC,
@@ -284,6 +260,10 @@ pub fn build(b: *std.Build) void {
         "CodeGen/include", "Inliner/include",         "Require/include", "Reduce/include",
         "extern",          "extern/isocline/include",
     };
+
+    // ==================================================================
+    // Register library creation step
+    // ==================================================================
 
     // ==================================================================
     // 1. Luau.Common
@@ -484,6 +464,37 @@ pub fn build(b: *std.Build) void {
     isocline_lib.root_module.addIncludePath(b.path("extern/isocline/include"));
     applyCrtMacros(isocline_lib.root_module, STATIC_CRT);
 
+    // ==================================================================
+    // Register CLI executables creation step
+    // ==================================================================
+    const repl_libs = &.{ compiler_lib, inliner_lib, config_lib, codegen_lib, vm_lib, require_lib, cli_lib, isocline_lib };
+    const repl_exe = createExecutable(b, target, optimize, "luau", repl_libs, &.{
+        "CLI/src/Repl.cpp",
+        "CLI/src/ReplEntry.cpp",
+        "CLI/src/ReplRequirer.cpp",
+        "CLI/src/Counters.cpp",
+        "CLI/src/Coverage.cpp",
+        "CLI/src/Profiler.cpp",
+    }, &inc_exe, create_opts);
+
+    const analyze_libs = &.{ analysis_lib, cli_lib, require_lib };
+    const analyze_exe = createExecutable(b, target, optimize, "luau-analyze", analyze_libs, &.{
+        "CLI/src/Analyze.cpp",
+        "CLI/src/AnalyzeRequirer.cpp",
+    }, &inc_exe, create_opts);
+
+    const ast_libs = &.{ ast_lib, analysis_lib, cli_lib };
+    const ast_exe = createExecutable(b, target, optimize, "luau-ast", ast_libs, &.{"CLI/src/Ast.cpp"}, &inc_exe, create_opts);
+
+    const compile_libs = &.{ compiler_lib, vm_lib, codegen_lib, cli_lib };
+    const compile_exe = createExecutable(b, target, optimize, "luau-compile", compile_libs, &.{"CLI/src/Compile.cpp"}, &inc_exe, create_opts);
+
+    const bytecode_libs = &.{ compiler_lib, vm_lib, codegen_lib, cli_lib };
+    const bytecode_exe = createExecutable(b, target, optimize, "luau-bytecode", bytecode_libs, &.{"CLI/src/Bytecode.cpp"}, &inc_exe, create_opts);
+
+    const reduce_libs = &.{ common_lib, ast_lib, analysis_lib, cli_lib };
+    const reduce_exe = createExecutable(b, target, optimize, "luau-reduce", reduce_libs, &.{"CLI/src/Reduce.cpp"}, &inc_exe, create_opts);
+
     if (USE_MSVC and LIBC_PATHS != null) {
         // -------------------- Parse `sys_include_dir` --------------------
         const libc_paths_content = std.Io.Dir.cwd().readFileAlloc(
@@ -501,53 +512,41 @@ pub fn build(b: *std.Build) void {
 
         // -------------------- Add the system include paths --------------------
         for ([_]*std.Build.Step.Compile{
-            common_lib, ast_lib,      bytecode_lib, vm_lib,      compiler_lib,
-            config_lib, analysis_lib, codegen_lib,  inliner_lib, require_lib,
-            cli_lib,    isocline_lib,
-        }) |lib| {
+            common_lib,  ast_lib,      bytecode_lib, vm_lib,      compiler_lib,
+            config_lib,  analysis_lib, codegen_lib,  inliner_lib, require_lib,
+            cli_lib,     isocline_lib, repl_exe,     analyze_exe, ast_exe,
+            compile_exe, bytecode_exe, reduce_exe,
+        }) |artifact| {
             for (libc_include_dirs) |libc_include_dir| {
-                lib.root_module.addSystemIncludePath(.{ .cwd_relative = libc_include_dir });
+                artifact.root_module.addSystemIncludePath(.{ .cwd_relative = libc_include_dir });
             }
         }
     }
 
     // ==================================================================
-    // CLI executables
+    // Build CLI executables on request
     // ==================================================================
-    if (build_cli) {
-        const repl_libs = &.{ compiler_lib, inliner_lib, config_lib, codegen_lib, vm_lib, require_lib, cli_lib, isocline_lib };
-        const repl_exe = createExecutable(b, target, optimize, "luau", repl_libs, &.{
-            "CLI/src/Repl.cpp",
-            "CLI/src/ReplEntry.cpp",
-            "CLI/src/ReplRequirer.cpp",
-            "CLI/src/Counters.cpp",
-            "CLI/src/Coverage.cpp",
-            "CLI/src/Profiler.cpp",
-        }, &inc_exe, create_opts);
+    if (BUILD_CLI) {
         b.installArtifact(repl_exe);
-
-        const analyze_libs = &.{ analysis_lib, cli_lib, require_lib };
-        const analyze_exe = createExecutable(b, target, optimize, "luau-analyze", analyze_libs, &.{
-            "CLI/src/Analyze.cpp",
-            "CLI/src/AnalyzeRequirer.cpp",
-        }, &inc_exe, create_opts);
         b.installArtifact(analyze_exe);
-
-        const ast_libs = &.{ ast_lib, analysis_lib, cli_lib };
-        const ast_exe = createExecutable(b, target, optimize, "luau-ast", ast_libs, &.{"CLI/src/Ast.cpp"}, &inc_exe, create_opts);
         b.installArtifact(ast_exe);
-
-        const compile_libs = &.{ compiler_lib, vm_lib, codegen_lib, cli_lib };
-        const compile_exe = createExecutable(b, target, optimize, "luau-compile", compile_libs, &.{"CLI/src/Compile.cpp"}, &inc_exe, create_opts);
         b.installArtifact(compile_exe);
-
-        const bytecode_libs = &.{ compiler_lib, vm_lib, codegen_lib, cli_lib };
-        const bytecode_exe = createExecutable(b, target, optimize, "luau-bytecode", bytecode_libs, &.{"CLI/src/Bytecode.cpp"}, &inc_exe, create_opts);
         b.installArtifact(bytecode_exe);
-
-        const reduce_libs = &.{ common_lib, ast_lib, analysis_lib, cli_lib };
-        const reduce_exe = createExecutable(b, target, optimize, "luau-reduce", reduce_libs, &.{"CLI/src/Reduce.cpp"}, &inc_exe, create_opts);
         b.installArtifact(reduce_exe);
+    }
+
+    // ==================================================================
+    // Build test executables on request
+    // ==================================================================
+    if (BUILD_TESTS) {
+        @panic("unimplemented");
+    }
+
+    // ==================================================================
+    // Build web artifacts on request
+    // ==================================================================
+    if (BUILD_WEB) {
+        @panic("unimplemented");
     }
 
     // ==================================================================

@@ -41,7 +41,7 @@ main :: proc() {
 ```
 
 ## build.zig
-The [`build.zig`](build.zig) file is a build system for Luau, written in Zig, for those who have already have the Zig toolchain available to them, but not that of CMake (...and for those who don't want to deal with the bloat of CMake).
+The [`build.zig`](build.zig) file is a build system for Luau, written in Zig, for those who have already have the Zig toolchain available to them, but not CMake (...and for those who don't want to deal with the bloat of CMake).
 
 To use it with respect to the structure of the repository, the recommended command is:
 ```sh

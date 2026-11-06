@@ -1,2 +1,2 @@
 .zig-cache
-luau_extern_c.h
+luau_target_comp_defs.h
