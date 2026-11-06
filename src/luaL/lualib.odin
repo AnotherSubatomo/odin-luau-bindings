@@ -1,9 +1,8 @@
-// Based on https://github.com/luau-lang/luau/blob/master/VM/include/lualib.h
+// Based on: https://github.com/luau-lang/luau/blob/master/VM/include/lualib.h
 
-package luau_vm_L
+package luau_vm_lib
 import "core:c"
 import "core:mem"
-import "base:intrinsics"
 import "../lua"
 
 when ODIN_OS == .Windows {
@@ -16,8 +15,8 @@ when ODIN_OS == .Windows {
 	}
 }
 
-State     :: lua.State
-CFunction :: lua.CFunction
+State       :: lua.State
+CFunction   :: lua.CFunction
 VECTOR_TYPE :: lua.VECTOR_TYPE
 BUFFERSIZE  :: lua.BUFFERSIZE
 

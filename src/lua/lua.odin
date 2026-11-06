@@ -1,4 +1,4 @@
-// Based on https://github.com/luau-lang/luau/blob/master/VM/include/lua.h
+// Based on: https://github.com/luau-lang/luau/blob/master/VM/include/lua.h
 
 package luau_vm
 import "core:c"

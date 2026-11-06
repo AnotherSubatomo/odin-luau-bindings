@@ -11,17 +11,17 @@ import "core:c"
 when ODIN_OS == .Windows {
 	foreign import LuauCompiler {
 		"./target/lib/luau.Compiler.lib",
-		"./target/lib/luau.Ast.lib",
-		"./target/lib/Luau.Bytecode.lib",
 		"./target/lib/Luau.VM.lib",
+		"./target/lib/Luau.Bytecode.lib",
+		"./target/lib/luau.Ast.lib",
 		"./target/lib/Luau.Common.lib",
 	}
 } else {
 	foreign import LuauCompiler {
 		"./target/lib/luau.Compiler.a",
-		"./target/lib/luau.Ast.a",
-		"./target/lib/Luau.Bytecode.a",
 		"./target/lib/Luau.VM.a",
+		"./target/lib/Luau.Bytecode.a",
+		"./target/lib/luau.Ast.a",
 		"./target/lib/Luau.Common.a",
 	}
 }
