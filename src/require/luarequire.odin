@@ -7,10 +7,18 @@ import "../lua"
 when ODIN_OS == .Windows {
 	foreign import LuauRequire {
 		"../target/lib/Luau.Require.lib",
+		"../target/lib/Luau.Config.lib",
+		"../target/lib/Luau.Compiler.lib",
+		"../target/lib/Luau.Ast.lib",
+		"../target/lib/Luau.VM.lib",
 	}
 } else {
 	foreign import LuauRequire {
-		"../target/lib/Luau.Require.a",
+		"../target/lib/libLuau.Require.a",
+		"../target/lib/libLuau.Config.a",
+		"../target/lib/libLuau.Compiler.a",
+		"../target/lib/libLuau.Ast.a",
+		"../target/lib/libLuau.VM.a",
 	}
 }
 
