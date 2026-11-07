@@ -43,8 +43,8 @@ foreign LuauVM {
 	register     :: proc(L: ^State, libname: cstring, l: [^]Reg) ---
 	getmetafield :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
 	callmeta     :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
-	typeerrorL   :: proc(L: ^State, narg: c.int, tname: cstring) -> ! ---
-	argerrorL    :: proc(L: ^State, narg: c.int, extramsg: cstring) -> ! ---
+	// typeerrorL   :: proc(L: ^State, narg: c.int, tname: cstring) -> ! ---
+	// argerrorL    :: proc(L: ^State, narg: c.int, extramsg: cstring) -> ! ---
 	checklstring :: proc(L: ^State, numArg: c.int, l: ^c.size_t) -> cstring ---
 	optlstring   :: proc(L: ^State, numArg: c.int, def: cstring, l: ^c.size_t) -> cstring ---
 	checknumber  :: proc(L: ^State, numArg: c.int) -> c.double ---
@@ -76,7 +76,7 @@ foreign LuauVM {
 	@(link_name = "luaL_where")
 	_where :: proc(L: ^State, lvl: c.int) ---
 
-	errorL :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> ! ---
+	// errorL :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> ! ---
 
 	checkoption :: proc(L: ^State, narg: c.int, def: cstring, lst: [^]cstring) -> c.int ---
 
@@ -217,6 +217,29 @@ foreign LuauVM {
 	openlibs      :: proc(L: ^State) ---
 	sandbox       :: proc(L: ^State) ---
 	sandboxthread :: proc(L: ^State) ---
+}
+
+// `l_noret` functions
+when lua.NORET_AS_PANIC {
+	typeerrorL :: proc "c" (L: ^State, narg: c.int, tname: cstring) -> ! {
+		context = runtime.default_context()
+		panic(fmt.tprintf("luaL_typeerror: arg #%d expected %s", narg, string(tname)))
+	}
+	argerrorL :: proc "c" (L: ^State, narg: c.int, extramsg: cstring) -> ! {
+		context = runtime.default_context()
+		panic(fmt.tprintf("luaL_argerror: arg #%d: %s", narg, string(extramsg)))
+	}
+	errorL :: proc "c" (L: ^State, fmt: cstring, #c_vararg args: ..any) -> ! {
+		context = runtime.default_context()
+		panic(string(fmt))
+	}
+} else {
+	@(link_prefix = "luaL_", default_calling_convention="c")
+	foreign LuauVM {
+		typeerrorL :: proc(L: ^State, narg: c.int, tname: cstring) -> ! ---
+		argerrorL  :: proc(L: ^State, narg: c.int, extramsg: cstring) -> ! ---
+		errorL     :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> ! ---
+	}
 }
 
 /******************************************************************************

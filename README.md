@@ -8,7 +8,9 @@ This repo contains Odin bindings for the [Luau](https://luau-lang.org) programmi
 ## Usage
 The bindings try to provide a full and faithful coverage as much as possible. As far as I know, the bindings for `lua_break` (a specialized debugging function used to stop thread execution on a debug breakpoint) and `luaL_where` are the only difference apparent in this binding (they were binded to appear as `lua.break_co` and `luaL._where` due to `break` and `where` being reserved keywords). Every API method in `LUA_API` and `LUALIB_API`, as of Luau 0.745, has been implemented.
 
-You can read about the difference between Luau and Lua [here](https://luau-lang.org/compatibility). To read about the Luau API, go [here](https://luau.org/api)
+During development, it may be more helpful to see Luau runtime errors as panics rather than silent program exits or ambiguous program crashes; which is why I've implemented a config flag called `NORET_AS_PANIC` for the following non-returning library methods: `lua.error`, `luaL.typeerrorL`, `luaL.argerrorL`, and `luaL.errorL`.
+
+You can read about the difference between Luau and Lua [here](https://luau-lang.org/compatibility). To read about the Luau API, go [here](https://luau.org/api).
 
 Here is a simple `main.odin` that reads a file, compiles it and then executes it:
 ```odin

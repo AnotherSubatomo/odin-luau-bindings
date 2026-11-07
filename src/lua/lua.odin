@@ -3,6 +3,8 @@
 package luau_vm
 import "core:c"
 
+NORET_AS_PANIC :: #config(NORET_AS_PANIC, false)
+
 when ODIN_OS == .Windows {
 	foreign import LuauVM {
 		"../target/lib/Luau.VM.lib",
@@ -362,7 +364,7 @@ foreign LuauVM {
 	/*
 	** miscellaneous functions
 	*/
-	error :: proc(L: ^State) -> ! ---
+	// error :: proc(L: ^State) -> ! ---
 
 	next    :: proc(L: ^State, idx: c.int) -> c.int ---
 	rawiter :: proc(L: ^State, idx, iter: c.int) -> c.int ---
@@ -562,6 +564,20 @@ foreign LuauVM {
 	callbacks :: proc(L: ^State) -> ^Callbacks ---
 
 	setmemorycage :: proc(L: ^State, alloc: CageAlloc, ud: rawptr) ---
+}
+
+// `l_noret` functions
+when NORET_AS_PANIC {
+	error :: proc(L: ^State) -> ! {
+		err_msg := tostring(L, -1)
+		pop(L, 1)
+		panic(err_msg)
+	}
+} else {
+	@(link_prefix = "lua_", default_calling_convention="c")
+	foreign LuauVM {
+		error :: proc (L: ^State) -> ! ---
+	}
 }
 
 /******************************************************************************
